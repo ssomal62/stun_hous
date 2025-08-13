@@ -1,0 +1,36 @@
+name: Test Self-hosted Runner
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  test-runner:
+    runs-on: self-hosted  # WSL의 Self-hosted Runner 사용
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Show environment info
+      run: |
+        echo "=== Environment Information ==="
+        echo "Runner: $RUNNER_NAME"
+        echo "OS: $(uname -a)"
+        echo "Current directory: $(pwd)"
+        echo "Working directory: $RUNNER_WORKSPACE"
+        echo "================================"
+        
+    - name: Test backend build
+      run: |
+        echo "=== Testing Backend Build ==="
+        cd backend
+        echo "Current directory: $(pwd)"
+        echo "Gradle wrapper exists: $(ls -la gradlew)"
+        echo "=============================="
+        
+    - name: Success message
+      run: |
+        echo "🎉 Self-hosted Runner 테스트 성공!"
+        echo "WSL 환경에서 GitHub Actions가 정상 작동합니다."
