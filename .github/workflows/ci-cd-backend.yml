@@ -17,6 +17,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Check system status
+      run: |
+        echo "=== System Check ==="
+        echo "Java version:"
+        java -version || echo "Java not found"
+        echo "Gradle wrapper:"
+        ls -la gradlew || echo "Gradle wrapper not found"
+        echo "Docker services:"
+        docker ps | grep -E "(postgres|redis)" || echo "Docker services not running"
+        echo "=================="
+      
     - name: Set up Java
       uses: actions/setup-java@v4
       with:
@@ -36,6 +47,7 @@ jobs:
           
     - name: Build with Gradle
       run: |
+        chmod +x ./gradlew
         ./gradlew :backend:build --no-daemon
         
     - name: Run tests
@@ -63,6 +75,13 @@ jobs:
         SPRING_PROFILES_ACTIVE: dev
       run: |
         echo "=== Deploying to WSL ==="
+        
+        # 환경변수 확인
+        echo "=== Environment Check ==="
+        echo "SPRING_PROFILES_ACTIVE: $SPRING_PROFILES_ACTIVE"
+        echo "DATABASE_URL: ${DATABASE_URL:-NOT_SET}"
+        echo "REDIS_HOST: ${REDIS_HOST:-NOT_SET}"
+        echo "========================"
         
         # 기존 애플리케이션 중지 (실행 중인 경우)
         echo "Stopping existing application..."
