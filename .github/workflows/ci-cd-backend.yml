@@ -1,0 +1,95 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'backend/**' ]  # 백엔드 코드 변경 시에만 실행
+  pull_request:
+    branches: [ main ]
+    paths: [ 'backend/**' ]
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  build-and-test:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+        cache: 'gradle'
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Build with Gradle
+      run: |
+        ./gradlew :backend:build --no-daemon
+        
+    - name: Run tests
+      run: |
+        ./gradlew :backend:test --no-daemon
+        
+    - name: Build info
+      run: |
+        echo "=== Build Information ==="
+        echo "Build completed successfully!"
+        echo "JAR file location: backend/build/libs/"
+        echo "=========================="
+        
+  deploy:
+    needs: build-and-test
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main'  # main 브랜치에만 배포
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to WSL
+      env:
+        SPRING_PROFILES_ACTIVE: dev
+      run: |
+        echo "=== Deploying to WSL ==="
+        
+        # 기존 애플리케이션 중지 (실행 중인 경우)
+        echo "Stopping existing application..."
+        pkill -f "stun_hous" || true
+        
+        # 새 JAR 파일 복사
+        echo "Copying new JAR file..."
+        cp backend/build/libs/*.jar /tmp/stun_hous.jar
+        
+        # 애플리케이션 실행 (dev 프로파일 사용)
+        echo "Starting new application with dev profile..."
+        nohup java -jar /tmp/stun_hous.jar --spring.profiles.active=dev > /tmp/stun_hous.log 2>&1 &
+        
+        echo "Application deployed successfully with dev profile!"
+        echo "Log file: /tmp/stun_hous.log"
+        echo "================================"
+        
+    - name: Health check
+      run: |
+        echo "=== Health Check ==="
+        sleep 10  # 애플리케이션 시작 대기
+        
+        # 포트 8080에서 애플리케이션 응답 확인
+        if curl -f http://localhost:8080/actuator/health; then
+          echo "✅ Application is running and healthy!"
+        else
+          echo "❌ Application health check failed!"
+          exit 1
+        fi
+        echo "==================="
